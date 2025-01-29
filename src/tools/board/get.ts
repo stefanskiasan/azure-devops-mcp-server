@@ -1,7 +1,12 @@
 import { AzureDevOpsConnection } from '../../api/connection.js';
-import { config } from '../../config/environment.js';
+import { AzureDevOpsConfig } from '../../config/environment.js';
 
-export async function getBoards(args: any) {
+interface GetBoardsArgs {
+  team?: string;
+}
+
+export async function getBoards(args: GetBoardsArgs, config: AzureDevOpsConfig) {
+  AzureDevOpsConnection.initialize(config);
   const connection = AzureDevOpsConnection.getInstance();
   const workApi = await connection.getWorkApi();
   

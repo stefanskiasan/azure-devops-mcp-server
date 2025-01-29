@@ -1,67 +1,38 @@
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { AzureDevOpsConnection } from '../../api/connection.js';
-import { config } from '../../config/environment.js';
+import { AzureDevOpsConfig } from '../../config/environment.js';
 
-interface PipelineInfo {
-  id: number;
-  name: string;
-  path?: string;
-  status?: string;
-  revision?: number;
-  type?: string;
-  createdDate?: Date;
-  project?: {
-    id?: string;
-    name?: string;
-  };
-}
-
-export async function getPipelines(args: {
+interface GetPipelinesArgs {
   folder?: string;
   name?: string;
-}): Promise<PipelineInfo[]> {
+}
+
+export async function getPipelines(args: GetPipelinesArgs, config: AzureDevOpsConfig) {
+  AzureDevOpsConnection.initialize(config);
   const connection = AzureDevOpsConnection.getInstance();
-  const buildApi = await connection.getBuildApi();
+  const pipelineApi = await connection.getBuildApi();
 
   try {
-    // Hole alle Definitionen mit minimalen Parametern
-    const definitions = await buildApi.getDefinitions(config.project);
+    const pipelines = await pipelineApi.getDefinitions(
+      config.project,
+      args.name,
+      args.folder
+    );
 
-    // Filtere die Ergebnisse basierend auf den Argumenten
-    let filteredDefinitions = definitions;
-    
-    if (args.folder) {
-      filteredDefinitions = filteredDefinitions.filter(def => 
-        def.path?.startsWith(args.folder || '')
-      );
-    }
-
-    if (args.name) {
-      filteredDefinitions = filteredDefinitions.filter(def => 
-        def.name?.toLowerCase().includes(args.name?.toLowerCase() || '')
-      );
-    }
-
-    // Transformiere die Ergebnisse in ein übersichtlicheres Format
-    return filteredDefinitions.map(def => {
-      const pipelineInfo: PipelineInfo = {
-        id: def.id || 0,
-        name: def.name || '',
-        path: def.path,
-        status: def.queueStatus?.toString(),
-        revision: def.revision,
-        type: def.type?.toString(),
-        createdDate: def.createdDate,
-        project: {
-          id: def.project?.id,
-          name: def.project?.name
-        }
-      };
-      return pipelineInfo;
-    });
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(pipelines, null, 2),
+        },
+      ],
+    };
   } catch (error: unknown) {
-    if (error instanceof Error) {
-      throw new Error(`Failed to fetch pipelines: ${error.message}`);
-    }
-    throw new Error('Failed to fetch pipelines: Unknown error occurred');
+    if (error instanceof McpError) throw error;
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    throw new McpError(
+      ErrorCode.InternalError,
+      `Failed to get pipelines: ${errorMessage}`
+    );
   }
 }

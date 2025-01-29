@@ -1,43 +1,61 @@
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { AzureDevOpsConnection } from '../../api/connection.js';
-import { WikiApi } from '../../api/wiki.js';
+import { AzureDevOpsConfig } from '../../config/environment.js';
 
-export async function updateWikiPage(args: any) {
-  if (!args.wikiIdentifier || typeof args.wikiIdentifier !== 'string') {
-    throw new McpError(ErrorCode.InvalidParams, 'Wiki identifier is required');
+interface UpdateWikiPageArgs {
+  wikiIdentifier: string;
+  path: string;
+  content: string;
+  comment?: string;
+}
+
+export async function updateWikiPage(args: UpdateWikiPageArgs, config: AzureDevOpsConfig) {
+  if (!args.wikiIdentifier || !args.path || !args.content) {
+    throw new McpError(
+      ErrorCode.InvalidParams,
+      'Wiki identifier, page path, and content are required'
+    );
   }
 
-  if (!args.path || typeof args.path !== 'string') {
-    throw new McpError(ErrorCode.InvalidParams, 'Page path is required');
-  }
-
-  if (!args.content || typeof args.content !== 'string') {
-    throw new McpError(ErrorCode.InvalidParams, 'Page content is required');
-  }
+  AzureDevOpsConnection.initialize(config);
+  const connection = AzureDevOpsConnection.getInstance();
+  const wikiApi = await connection.getWikiApi();
 
   try {
-    const connection = AzureDevOpsConnection.getInstance();
-    const wikiApi = new WikiApi(connection);
+    const wiki = await wikiApi.getWiki(config.project, args.wikiIdentifier);
+    if (!wiki || !wiki.id) {
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        `Wiki ${args.wikiIdentifier} not found`
+      );
+    }
 
-    const updatedPage = await wikiApi.updateWikiPage(
-      args.wikiIdentifier,
-      args.path,
-      args.content,
-      args.comment
-    );
+    const updateParams = {
+      content: args.content,
+      comment: args.comment || `Updated page ${args.path}`,
+    };
 
+    // Da die Wiki-API keine direkte Methode zum Aktualisieren von Seiten bietet,
+    // geben wir vorerst nur die Wiki-Informationen zurück
     return {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(updatedPage, null, 2),
+          text: JSON.stringify({
+            wiki,
+            path: args.path,
+            message: 'Wiki page update is not supported in the current API version',
+            requestedUpdate: updateParams
+          }, null, 2),
         },
       ],
     };
-  } catch (error) {
+  } catch (error: unknown) {
+    if (error instanceof McpError) throw error;
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     throw new McpError(
       ErrorCode.InternalError,
-      `Failed to update wiki page: ${error instanceof Error ? error.message : 'Unknown error'}`
+      `Failed to update wiki page: ${errorMessage}`
     );
   }
 }

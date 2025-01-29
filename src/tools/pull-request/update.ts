@@ -1,82 +1,112 @@
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { AzureDevOpsConnection } from '../../api/connection.js';
-import * as azdev from 'azure-devops-node-api';
+import { AzureDevOpsConfig } from '../../config/environment.js';
+import { 
+  GitPullRequest, 
+  PullRequestStatus,
+  GitPullRequestMergeStrategy 
+} from 'azure-devops-node-api/interfaces/GitInterfaces.js';
 
-type UpdateStatus = 'active' | 'abandoned' | 'completed';
-type MergeStrategy = 'squash' | 'rebase' | 'merge';
-
-export async function updatePullRequest(args: {
+interface UpdatePullRequestArgs {
   pullRequestId: number;
-  status?: UpdateStatus;
+  status?: 'active' | 'abandoned' | 'completed';
   title?: string;
   description?: string;
-  mergeStrategy?: MergeStrategy;
-}) {
+  mergeStrategy?: 'squash' | 'rebase' | 'merge';
+}
+
+export async function updatePullRequest(args: UpdatePullRequestArgs, config: AzureDevOpsConfig) {
+  if (!args.pullRequestId) {
+    throw new McpError(ErrorCode.InvalidParams, 'Pull Request ID is required');
+  }
+
+  AzureDevOpsConnection.initialize(config);
   const connection = AzureDevOpsConnection.getInstance();
   const gitApi = await connection.getGitApi();
 
   try {
-    // Hole den aktuellen Pull Request
-    const currentPR = await gitApi.getPullRequestById(args.pullRequestId);
-    
-    if (!currentPR) {
-      throw new Error(`Pull request ${args.pullRequestId} not found`);
+    // Get current PR
+    const currentPr = await gitApi.getPullRequestById(args.pullRequestId, config.project);
+    if (!currentPr) {
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        `Pull Request with ID ${args.pullRequestId} not found`
+      );
     }
 
-    if (!currentPR.repository?.id) {
-      throw new Error('Repository ID not found in pull request');
+    if (!currentPr.repository?.id) {
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        `Repository information not found for PR ${args.pullRequestId}`
+      );
     }
 
-    // Mapping von unseren Status-Strings zu den API-Status-Werten
-    const statusMap: Record<UpdateStatus, number> = {
-      active: 1,      // PullRequestStatus.Active
-      completed: 3,   // PullRequestStatus.Completed
-      abandoned: 2    // PullRequestStatus.Abandoned
+    // Prepare update
+    const prUpdate: GitPullRequest = {
+      ...currentPr,
+      title: args.title || currentPr.title,
+      description: args.description || currentPr.description,
     };
 
-    // Mapping von unseren Merge-Strategie-Strings zu den API-Werten
-    const mergeStrategyMap: Record<MergeStrategy, number> = {
-      squash: 3,    // GitPullRequestMergeStrategy.Squash
-      rebase: 2,    // GitPullRequestMergeStrategy.Rebase
-      merge: 1      // GitPullRequestMergeStrategy.NoFastForward
-    };
-
-    // Erstelle das Update-Objekt
-    const pullRequestToUpdate = {
-      ...currentPR,
-      status: args.status ? statusMap[args.status] : currentPR.status,
-      title: args.title || currentPR.title,
-      description: args.description || currentPR.description
-    };
-
-    // Wenn eine Merge-Strategie angegeben wurde und der Status auf 'completed' gesetzt wird
-    if (args.mergeStrategy && args.status === 'completed') {
-      await gitApi.updatePullRequest(
-        {
-          ...pullRequestToUpdate,
-          completionOptions: {
-            mergeStrategy: mergeStrategyMap[args.mergeStrategy],
-            deleteSourceBranch: true
+    // Handle status changes
+    if (args.status) {
+      switch (args.status) {
+        case 'active':
+          prUpdate.status = 1 as PullRequestStatus; // Active
+          break;
+        case 'abandoned':
+          prUpdate.status = 2 as PullRequestStatus; // Abandoned
+          break;
+        case 'completed':
+          prUpdate.status = 3 as PullRequestStatus; // Completed
+          if (args.mergeStrategy) {
+            let mergeStrategyValue: GitPullRequestMergeStrategy;
+            switch (args.mergeStrategy) {
+              case 'squash':
+                mergeStrategyValue = 3; // GitPullRequestMergeStrategy.Squash
+                break;
+              case 'rebase':
+                mergeStrategyValue = 2; // GitPullRequestMergeStrategy.Rebase
+                break;
+              case 'merge':
+                mergeStrategyValue = 1; // GitPullRequestMergeStrategy.NoFastForward
+                break;
+              default:
+                mergeStrategyValue = 1; // Default to no-fast-forward
+            }
+            
+            prUpdate.completionOptions = {
+              mergeStrategy: mergeStrategyValue,
+              deleteSourceBranch: true,
+              squashMerge: args.mergeStrategy === 'squash',
+            };
           }
-        },
-        currentPR.repository.id,
-        args.pullRequestId
-      );
-    } else {
-      // Normales Update ohne Merge
-      await gitApi.updatePullRequest(
-        pullRequestToUpdate,
-        currentPR.repository.id,
-        args.pullRequestId
-      );
+          break;
+      }
     }
 
-    // Hole den aktualisierten Pull Request
-    const updatedPR = await gitApi.getPullRequestById(args.pullRequestId);
-    return updatedPR;
+    // Update PR
+    const updatedPr = await gitApi.updatePullRequest(
+      prUpdate,
+      currentPr.repository.id,
+      args.pullRequestId,
+      config.project
+    );
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(updatedPr, null, 2),
+        },
+      ],
+    };
   } catch (error: unknown) {
-    if (error instanceof Error) {
-      throw new Error(`Failed to update pull request: ${error.message}`);
-    }
-    throw new Error('Failed to update pull request: Unknown error occurred');
+    if (error instanceof McpError) throw error;
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    throw new McpError(
+      ErrorCode.InternalError,
+      `Failed to update pull request: ${errorMessage}`
+    );
   }
 }

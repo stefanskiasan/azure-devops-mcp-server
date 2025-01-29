@@ -1,12 +1,17 @@
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { AzureDevOpsConnection } from '../../api/connection.js';
-import { config } from '../../config/environment.js';
+import { AzureDevOpsConfig } from '../../config/environment.js';
 
-export async function listWorkItems(args: any) {
+interface ListWorkItemsArgs {
+  query: string;
+}
+
+export async function listWorkItems(args: ListWorkItemsArgs, config: AzureDevOpsConfig) {
   if (!args.query || typeof args.query !== 'string') {
     throw new McpError(ErrorCode.InvalidParams, 'Invalid WIQL query');
   }
 
+  AzureDevOpsConnection.initialize(config);
   const connection = AzureDevOpsConnection.getInstance();
   const workItemTrackingApi = await connection.getWorkItemTrackingApi();
   
@@ -15,32 +20,11 @@ export async function listWorkItems(args: any) {
     { project: config.project }
   );
 
-  if (!queryResult.workItems?.length) {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: 'No work items found',
-        },
-      ],
-    };
-  }
-
-  const workItemIds = queryResult.workItems
-    .map((wi) => wi.id)
-    .filter((id): id is number => typeof id === 'number');
-
-  const fields = ['System.Id', 'System.Title', 'System.State', 'System.Description'];
-  const workItems = await workItemTrackingApi.getWorkItems(
-    workItemIds,
-    fields
-  );
-
   return {
     content: [
       {
         type: 'text',
-        text: JSON.stringify(workItems, null, 2),
+        text: JSON.stringify(queryResult, null, 2),
       },
     ],
   };

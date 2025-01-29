@@ -1,78 +1,60 @@
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { AzureDevOpsConnection } from '../../api/connection.js';
-import * as azdev from 'azure-devops-node-api';
+import { AzureDevOpsConfig } from '../../config/environment.js';
+import { PullRequestStatus } from 'azure-devops-node-api/interfaces/GitInterfaces.js';
 
-type StatusType = 'active' | 'completed' | 'abandoned';
-
-export async function getPullRequests(args: {
-  status?: StatusType;
+interface GetPullRequestsArgs {
+  status?: 'active' | 'completed' | 'abandoned';
   creatorId?: string;
   repositoryId?: string;
-}) {
-  const connection = AzureDevOpsConnection.getInstance();
-  const gitApi = await connection.getGitApi();
-
-  if (!args.repositoryId) {
-    throw new Error('Repository ID is required');
-  }
-
-  // Mapping von unseren Status-Strings zu den API-Status-Werten
-  const statusMap: Record<StatusType, number> = {
-    active: 1,      // PullRequestStatus.Active
-    completed: 3,   // PullRequestStatus.Completed
-    abandoned: 2    // PullRequestStatus.Abandoned
-  };
-
-  const searchCriteria = {
-    status: args.status ? statusMap[args.status] : undefined,
-    creatorId: args.creatorId,
-    repositoryId: args.repositoryId
-  };
-
-  try {
-    const pullRequests = await gitApi.getPullRequests(
-      args.repositoryId,
-      searchCriteria
-    );
-    return pullRequests;
-  } catch (error: unknown) {
-    if (error instanceof Error) {
-      throw new Error(`Failed to fetch pull requests: ${error.message}`);
-    }
-    throw new Error('Failed to fetch pull requests: Unknown error occurred');
-  }
 }
 
-export async function getPullRequest(args: {
-  pullRequestId: number;
-  includeWorkItems?: boolean;
-}) {
+export async function getPullRequests(args: GetPullRequestsArgs, config: AzureDevOpsConfig) {
+  AzureDevOpsConnection.initialize(config);
   const connection = AzureDevOpsConnection.getInstance();
   const gitApi = await connection.getGitApi();
 
   try {
-    const pullRequest = await gitApi.getPullRequestById(args.pullRequestId);
-    
-    if (!pullRequest) {
-      throw new Error(`Pull request ${args.pullRequestId} not found`);
+    let statusFilter: PullRequestStatus | undefined;
+    if (args.status) {
+      switch (args.status) {
+        case 'active':
+          statusFilter = 1; // PullRequestStatus.Active
+          break;
+        case 'completed':
+          statusFilter = 3; // PullRequestStatus.Completed
+          break;
+        case 'abandoned':
+          statusFilter = 2; // PullRequestStatus.Abandoned
+          break;
+      }
     }
 
-    if (args.includeWorkItems && pullRequest.repository?.id) {
-      const workItemRefs = await gitApi.getPullRequestWorkItemRefs(
-        pullRequest.repository.id,
-        args.pullRequestId
-      );
-      
-      return {
-        ...pullRequest,
-        workItemRefs
-      };
-    }
+    const searchCriteria = {
+      status: statusFilter,
+      creatorId: args.creatorId,
+      repositoryId: args.repositoryId,
+    };
 
-    return pullRequest;
+    const pullRequests = await gitApi.getPullRequests(
+      args.repositoryId || config.project,
+      searchCriteria
+    );
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(pullRequests, null, 2),
+        },
+      ],
+    };
   } catch (error: unknown) {
-    if (error instanceof Error) {
-      throw new Error(`Failed to fetch pull request ${args.pullRequestId}: ${error.message}`);
-    }
-    throw new Error(`Failed to fetch pull request ${args.pullRequestId}: Unknown error occurred`);
+    if (error instanceof McpError) throw error;
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    throw new McpError(
+      ErrorCode.InternalError,
+      `Failed to get pull requests: ${errorMessage}`
+    );
   }
 }

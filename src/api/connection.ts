@@ -1,15 +1,26 @@
 import * as azdev from 'azure-devops-node-api';
 import { WebApi } from 'azure-devops-node-api';
-import { config } from '../config/environment.js';
+import { AzureDevOpsConfig } from '../config/environment.js';
 
 export class AzureDevOpsConnection {
-  private static instance: WebApi;
+  private static instance: WebApi | null = null;
+  private static config: AzureDevOpsConfig;
+
+  public static initialize(config: AzureDevOpsConfig): void {
+    this.config = config;
+    // Reset instance when config changes
+    this.instance = null;
+  }
 
   public static getInstance(): WebApi {
-    if (!AzureDevOpsConnection.instance) {
-      const authHandler = azdev.getPersonalAccessTokenHandler(config.pat);
-      AzureDevOpsConnection.instance = new azdev.WebApi(config.orgUrl, authHandler);
+    if (!this.config) {
+      throw new Error('AzureDevOpsConnection must be initialized with config before use');
     }
-    return AzureDevOpsConnection.instance;
+
+    if (!this.instance) {
+      const authHandler = azdev.getPersonalAccessTokenHandler(this.config.pat);
+      this.instance = new azdev.WebApi(this.config.orgUrl, authHandler);
+    }
+    return this.instance;
   }
 }

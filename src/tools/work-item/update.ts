@@ -1,14 +1,24 @@
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { AzureDevOpsConnection } from '../../api/connection.js';
-import { config } from '../../config/environment.js';
+import { AzureDevOpsConfig } from '../../config/environment.js';
 
-export async function updateWorkItem(args: any) {
+interface UpdateWorkItemArgs {
+  id: number;
+  title?: string;
+  description?: string;
+  assignedTo?: string;
+  state?: string;
+  tags?: string[];
+}
+
+export async function updateWorkItem(args: UpdateWorkItemArgs, config: AzureDevOpsConfig) {
   if (!args.id || typeof args.id !== 'number') {
     throw new McpError(ErrorCode.InvalidParams, 'Invalid work item ID');
   }
 
+  AzureDevOpsConnection.initialize(config);
   const connection = AzureDevOpsConnection.getInstance();
-  const client = await connection.getWorkItemTrackingApi();
+  const workItemTrackingApi = await connection.getWorkItemTrackingApi();
 
   const patchDocument = [];
 
@@ -48,39 +58,27 @@ export async function updateWorkItem(args: any) {
     patchDocument.push({
       op: 'add',
       path: '/fields/System.Tags',
-      value: Array.isArray(args.tags) ? args.tags.join('; ') : args.tags,
+      value: args.tags.join('; '),
     });
   }
 
   if (patchDocument.length === 0) {
-    throw new McpError(
-      ErrorCode.InvalidParams,
-      'No fields provided for update'
-    );
+    throw new McpError(ErrorCode.InvalidParams, 'No fields provided for update');
   }
 
-  try {
-    const workItem = await client.updateWorkItem(
-      null,
-      patchDocument,
-      args.id,
-      config.project,
-      false,
-      true
-    );
+  const workItem = await workItemTrackingApi.updateWorkItem(
+    undefined,
+    patchDocument,
+    args.id,
+    config.project
+  );
 
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(workItem, null, 2),
-        },
-      ],
-    };
-  } catch (error: any) {
-    throw new McpError(
-      ErrorCode.InternalError,
-      `Failed to update work item: ${error?.message || 'Unknown error'}`
-    );
-  }
+  return {
+    content: [
+      {
+        type: 'text',
+        text: JSON.stringify(workItem, null, 2),
+      },
+    ],
+  };
 }

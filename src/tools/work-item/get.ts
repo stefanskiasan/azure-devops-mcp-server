@@ -1,12 +1,17 @@
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { AzureDevOpsConnection } from '../../api/connection.js';
-import { config } from '../../config/environment.js';
+import { AzureDevOpsConfig } from '../../config/environment.js';
 
-export async function getWorkItem(args: any) {
+interface GetWorkItemArgs {
+  id: number;
+}
+
+export async function getWorkItem(args: GetWorkItemArgs, config: AzureDevOpsConfig) {
   if (!args.id || typeof args.id !== 'number') {
     throw new McpError(ErrorCode.InvalidParams, 'Invalid work item ID');
   }
 
+  AzureDevOpsConnection.initialize(config);
   const connection = AzureDevOpsConnection.getInstance();
   const workItemTrackingApi = await connection.getWorkItemTrackingApi();
   const fields = ['System.Id', 'System.Title', 'System.State', 'System.Description'];

@@ -15,16 +15,7 @@ import { wikiTools } from './tools/wiki/index.js';
 import { projectTools } from './tools/project/index.js';
 import { pipelineTools } from './tools/pipeline/index.js';
 import { pullRequestTools } from './tools/pull-request/index.js';
-
-// Combine all tool definitions
-const toolDefinitions = [
-  ...workItemTools.definitions,
-  ...boardTools.definitions,
-  ...wikiTools.definitions,
-  ...projectTools.definitions,
-  ...pipelineTools.definitions,
-  ...pullRequestTools.definitions,
-];
+import { AzureDevOpsConfig, createConfig } from './config/environment.js';
 
 // Type Validations
 function validateArgs<T>(args: Record<string, unknown> | undefined, errorMessage: string): T {
@@ -62,8 +53,32 @@ function formatResponse(data: unknown): McpResponse {
 
 class AzureDevOpsServer {
   private server: Server;
+  private config: AzureDevOpsConfig;
+  private toolDefinitions: any[];
 
-  constructor() {
+  constructor(options?: Partial<Omit<AzureDevOpsConfig, 'orgUrl'>>) {
+    this.config = createConfig(options);
+    
+    // Initialize tools with config
+    const toolInstances = {
+      workItem: workItemTools.initialize(this.config),
+      board: boardTools.initialize(this.config),
+      wiki: wikiTools.initialize(this.config),
+      project: projectTools.initialize(this.config),
+      pipeline: pipelineTools.initialize(this.config),
+      pullRequest: pullRequestTools.initialize(this.config),
+    };
+
+    // Combine all tool definitions
+    this.toolDefinitions = [
+      ...toolInstances.workItem.definitions,
+      ...toolInstances.board.definitions,
+      ...toolInstances.wiki.definitions,
+      ...toolInstances.project.definitions,
+      ...toolInstances.pipeline.definitions,
+      ...toolInstances.pullRequest.definitions,
+    ];
+
     this.server = new Server(
       {
         name: 'azure-devops-server',
@@ -76,7 +91,7 @@ class AzureDevOpsServer {
       }
     );
 
-    this.setupToolHandlers();
+    this.setupToolHandlers(toolInstances);
     
     // Error handling
     this.server.onerror = (error) => console.error('[MCP Error]', error);
@@ -86,10 +101,10 @@ class AzureDevOpsServer {
     });
   }
 
-  private setupToolHandlers() {
+  private setupToolHandlers(tools: any) {
     // List available tools
     this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
-      tools: toolDefinitions,
+      tools: this.toolDefinitions,
     }));
 
     // Handle tool calls
@@ -99,66 +114,66 @@ class AzureDevOpsServer {
         switch (request.params.name) {
           // Work Item Tools
           case 'get_work_item':
-            result = await workItemTools.getWorkItem(request.params.arguments);
+            result = await tools.workItem.getWorkItem(request.params.arguments);
             break;
           case 'list_work_items':
-            result = await workItemTools.listWorkItems(request.params.arguments);
+            result = await tools.workItem.listWorkItems(request.params.arguments);
             break;
           
           // Board Tools
           case 'get_boards':
-            result = await boardTools.getBoards(request.params.arguments);
+            result = await tools.board.getBoards(request.params.arguments);
             break;
           
           // Wiki Tools
           case 'get_wikis':
-            result = await wikiTools.getWikis(request.params.arguments);
+            result = await tools.wiki.getWikis(request.params.arguments);
             break;
           case 'get_wiki_page':
-            result = await wikiTools.getWikiPage(request.params.arguments);
+            result = await tools.wiki.getWikiPage(request.params.arguments);
             break;
           case 'create_wiki':
-            result = await wikiTools.createWiki(request.params.arguments);
+            result = await tools.wiki.createWiki(request.params.arguments);
             break;
           case 'update_wiki_page':
-            result = await wikiTools.updateWikiPage(request.params.arguments);
+            result = await tools.wiki.updateWikiPage(request.params.arguments);
             break;
           
           // Project Tools
           case 'list_projects':
-            result = await projectTools.listProjects(request.params.arguments);
+            result = await tools.project.listProjects(request.params.arguments);
             break;
 
           // Pipeline Tools
           case 'list_pipelines':
-            result = await pipelineTools.getPipelines(
+            result = await tools.pipeline.getPipelines(
               validateArgs(request.params.arguments, 'Pipeline arguments required')
             );
             break;
           case 'trigger_pipeline':
-            result = await pipelineTools.triggerPipeline(
+            result = await tools.pipeline.triggerPipeline(
               validateArgs(request.params.arguments, 'Pipeline trigger arguments required')
             );
             break;
 
           // Pull Request Tools
           case 'list_pull_requests':
-            result = await pullRequestTools.getPullRequests(
+            result = await tools.pullRequest.getPullRequests(
               validateArgs(request.params.arguments, 'Pull request list arguments required')
             );
             break;
           case 'get_pull_request':
-            result = await pullRequestTools.getPullRequest(
+            result = await tools.pullRequest.getPullRequest(
               validateArgs(request.params.arguments, 'Pull request ID required')
             );
             break;
           case 'create_pull_request':
-            result = await pullRequestTools.createPullRequest(
+            result = await tools.pullRequest.createPullRequest(
               validateArgs(request.params.arguments, 'Pull request creation arguments required')
             );
             break;
           case 'update_pull_request':
-            result = await pullRequestTools.updatePullRequest(
+            result = await tools.pullRequest.updatePullRequest(
               validateArgs(request.params.arguments, 'Pull request update arguments required')
             );
             break;
@@ -194,5 +209,6 @@ class AzureDevOpsServer {
   }
 }
 
+// Allow configuration through constructor or environment variables
 const server = new AzureDevOpsServer();
 server.run().catch(console.error);

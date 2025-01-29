@@ -1,21 +1,32 @@
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { AzureDevOpsConnection } from '../../api/connection.js';
-import { WikiApi } from '../../api/wiki.js';
+import { AzureDevOpsConfig } from '../../config/environment.js';
+import { WikiType } from 'azure-devops-node-api/interfaces/WikiInterfaces.js';
 
-export async function createWiki(args: any) {
-  if (!args.name || typeof args.name !== 'string') {
+interface CreateWikiArgs {
+  name: string;
+  projectId?: string;
+  mappedPath?: string;
+}
+
+export async function createWiki(args: CreateWikiArgs, config: AzureDevOpsConfig) {
+  if (!args.name) {
     throw new McpError(ErrorCode.InvalidParams, 'Wiki name is required');
   }
 
-  try {
-    const connection = AzureDevOpsConnection.getInstance();
-    const wikiApi = new WikiApi(connection);
+  AzureDevOpsConnection.initialize(config);
+  const connection = AzureDevOpsConnection.getInstance();
+  const wikiApi = await connection.getWikiApi();
 
-    const wiki = await wikiApi.createWiki(
-      args.name,
-      args.projectId,
-      args.mappedPath
-    );
+  try {
+    const wikiCreateParams = {
+      name: args.name,
+      projectId: args.projectId || config.project,
+      mappedPath: args.mappedPath || '/',
+      type: WikiType.ProjectWiki,
+    };
+
+    const wiki = await wikiApi.createWiki(wikiCreateParams, config.project);
 
     return {
       content: [
@@ -25,10 +36,12 @@ export async function createWiki(args: any) {
         },
       ],
     };
-  } catch (error) {
+  } catch (error: unknown) {
+    if (error instanceof McpError) throw error;
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     throw new McpError(
       ErrorCode.InternalError,
-      `Failed to create wiki: ${error instanceof Error ? error.message : 'Unknown error'}`
+      `Failed to create wiki: ${errorMessage}`
     );
   }
 }

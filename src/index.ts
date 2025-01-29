@@ -7,25 +7,63 @@ import {
   ListToolsRequestSchema,
   McpError,
 } from '@modelcontextprotocol/sdk/types.js';
-import * as azdev from 'azure-devops-node-api';
 
-// Environment variables for configuration
-const PAT = process.env.AZURE_DEVOPS_PAT ?? '';
-const ORG = process.env.AZURE_DEVOPS_ORG ?? '';
-const PROJECT = process.env.AZURE_DEVOPS_PROJECT ?? '';
+// Import all tools
+import { workItemTools } from './tools/work-item/index.js';
+import { boardTools } from './tools/board/index.js';
+import { wikiTools } from './tools/wiki/index.js';
+import { projectTools } from './tools/project/index.js';
+import { pipelineTools } from './tools/pipeline/index.js';
+import { pullRequestTools } from './tools/pull-request/index.js';
 
-if (!PAT || !ORG || !PROJECT || PAT.trim() === '' || ORG.trim() === '' || PROJECT.trim() === '') {
-  throw new Error(
-    'Required environment variables AZURE_DEVOPS_PAT, AZURE_DEVOPS_ORG, and AZURE_DEVOPS_PROJECT must be set'
-  );
+// Combine all tool definitions
+const toolDefinitions = [
+  ...workItemTools.definitions,
+  ...boardTools.definitions,
+  ...wikiTools.definitions,
+  ...projectTools.definitions,
+  ...pipelineTools.definitions,
+  ...pullRequestTools.definitions,
+];
+
+// Type Validations
+function validateArgs<T>(args: Record<string, unknown> | undefined, errorMessage: string): T {
+  if (!args) {
+    throw new McpError(ErrorCode.InvalidParams, errorMessage);
+  }
+  return args as T;
+}
+
+// Response Types
+interface ContentItem {
+  type: string;
+  text: string;
+}
+
+interface McpResponse {
+  content: ContentItem[];
+  isError?: boolean;
+}
+
+// Response Formatting
+function formatResponse(data: unknown): McpResponse {
+  if (data && typeof data === 'object' && 'content' in data) {
+    return data as McpResponse;
+  }
+  return {
+    content: [
+      {
+        type: 'text',
+        text: JSON.stringify(data, null, 2),
+      },
+    ],
+  };
 }
 
 class AzureDevOpsServer {
   private server: Server;
-  private connection: azdev.WebApi;
 
   constructor() {
-    // Initialize MCP server
     this.server = new Server(
       {
         name: 'azure-devops-server',
@@ -37,11 +75,6 @@ class AzureDevOpsServer {
         },
       }
     );
-
-    // Initialize Azure DevOps connection
-    const orgUrl = `https://dev.azure.com/${ORG}`;
-    const authHandler = azdev.getPersonalAccessTokenHandler(PAT);
-    this.connection = new azdev.WebApi(orgUrl, authHandler);
 
     this.setupToolHandlers();
     
@@ -56,67 +89,93 @@ class AzureDevOpsServer {
   private setupToolHandlers() {
     // List available tools
     this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
-      tools: [
-        {
-          name: 'get_work_item',
-          description: 'Get a work item by ID',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              id: {
-                type: 'number',
-                description: 'Work item ID',
-              },
-            },
-            required: ['id'],
-          },
-        },
-        {
-          name: 'list_work_items',
-          description: 'List work items from a board',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              query: {
-                type: 'string',
-                description: 'WIQL query to filter work items',
-              },
-            },
-            required: ['query'],
-          },
-        },
-        {
-          name: 'get_boards',
-          description: 'List available boards in the project',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              team: {
-                type: 'string',
-                description: 'Team name (optional)',
-              },
-            },
-          },
-        },
-      ],
+      tools: toolDefinitions,
     }));
 
     // Handle tool calls
-    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    this.server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
       try {
+        let result;
         switch (request.params.name) {
+          // Work Item Tools
           case 'get_work_item':
-            return await this.getWorkItem(request.params.arguments);
+            result = await workItemTools.getWorkItem(request.params.arguments);
+            break;
           case 'list_work_items':
-            return await this.listWorkItems(request.params.arguments);
+            result = await workItemTools.listWorkItems(request.params.arguments);
+            break;
+          
+          // Board Tools
           case 'get_boards':
-            return await this.getBoards(request.params.arguments);
+            result = await boardTools.getBoards(request.params.arguments);
+            break;
+          
+          // Wiki Tools
+          case 'get_wikis':
+            result = await wikiTools.getWikis(request.params.arguments);
+            break;
+          case 'get_wiki_page':
+            result = await wikiTools.getWikiPage(request.params.arguments);
+            break;
+          case 'create_wiki':
+            result = await wikiTools.createWiki(request.params.arguments);
+            break;
+          case 'update_wiki_page':
+            result = await wikiTools.updateWikiPage(request.params.arguments);
+            break;
+          
+          // Project Tools
+          case 'list_projects':
+            result = await projectTools.listProjects(request.params.arguments);
+            break;
+
+          // Pipeline Tools
+          case 'list_pipelines':
+            result = await pipelineTools.getPipelines(
+              validateArgs(request.params.arguments, 'Pipeline arguments required')
+            );
+            break;
+          case 'trigger_pipeline':
+            result = await pipelineTools.triggerPipeline(
+              validateArgs(request.params.arguments, 'Pipeline trigger arguments required')
+            );
+            break;
+
+          // Pull Request Tools
+          case 'list_pull_requests':
+            result = await pullRequestTools.getPullRequests(
+              validateArgs(request.params.arguments, 'Pull request list arguments required')
+            );
+            break;
+          case 'get_pull_request':
+            result = await pullRequestTools.getPullRequest(
+              validateArgs(request.params.arguments, 'Pull request ID required')
+            );
+            break;
+          case 'create_pull_request':
+            result = await pullRequestTools.createPullRequest(
+              validateArgs(request.params.arguments, 'Pull request creation arguments required')
+            );
+            break;
+          case 'update_pull_request':
+            result = await pullRequestTools.updatePullRequest(
+              validateArgs(request.params.arguments, 'Pull request update arguments required')
+            );
+            break;
+          
           default:
             throw new McpError(
               ErrorCode.MethodNotFound,
               `Unknown tool: ${request.params.name}`
             );
         }
+
+        // Ensure consistent response format
+        const response = formatResponse(result);
+        return {
+          _meta: request.params._meta,
+          ...response
+        };
       } catch (error: unknown) {
         if (error instanceof McpError) throw error;
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -126,93 +185,6 @@ class AzureDevOpsServer {
         );
       }
     });
-  }
-
-  private async getWorkItem(args: any) {
-    if (!args.id || typeof args.id !== 'number') {
-      throw new McpError(ErrorCode.InvalidParams, 'Invalid work item ID');
-    }
-
-    const workItemTrackingApi = await this.connection.getWorkItemTrackingApi();
-    const fields = ['System.Id', 'System.Title', 'System.State', 'System.Description'];
-    const workItem = await workItemTrackingApi.getWorkItem(
-      args.id,
-      fields,
-      undefined,
-      undefined,
-      PROJECT
-    );
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(workItem, null, 2),
-        },
-      ],
-    };
-  }
-
-  private async listWorkItems(args: any) {
-    if (!args.query || typeof args.query !== 'string') {
-      throw new McpError(ErrorCode.InvalidParams, 'Invalid WIQL query');
-    }
-
-    const workItemTrackingApi = await this.connection.getWorkItemTrackingApi();
-    const queryResult = await workItemTrackingApi.queryByWiql(
-      { query: args.query },
-      { project: PROJECT }
-    );
-
-    if (!queryResult.workItems?.length) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: 'No work items found',
-          },
-        ],
-      };
-    }
-
-    const workItemIds = queryResult.workItems
-      .map((wi) => wi.id)
-      .filter((id): id is number => typeof id === 'number');
-
-    const fields = ['System.Id', 'System.Title', 'System.State', 'System.Description'];
-    // Get work items with minimal fields
-    const workItems = await workItemTrackingApi.getWorkItems(
-      workItemIds,
-      fields
-    );
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(workItems, null, 2),
-        },
-      ],
-    };
-  }
-
-  private async getBoards(args: any) {
-    const workApi = await this.connection.getWorkApi();
-    const teamContext = {
-      project: PROJECT,
-      team: args.team || PROJECT + ' Team',
-    };
-
-    const boards = await workApi.getBoards(teamContext);
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(boards, null, 2),
-        },
-      ],
-    };
   }
 
   async run() {

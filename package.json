@@ -19,7 +19,9 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "0.6.0",
-    "azure-devops-node-api": "^14.1.0"
+    "@types/node-fetch": "^2.6.12",
+    "azure-devops-node-api": "^14.1.0",
+    "node-fetch": "^2.7.0"
   },
   "devDependencies": {
     "@types/node": "^20.11.24",

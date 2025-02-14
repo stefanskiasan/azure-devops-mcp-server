@@ -198,6 +198,16 @@ To modify or extend the server:
 3. Build with `npm run build` when ready
 4. Test using the inspector: `npm run inspector`
 
+## Continuous Integration
+
+The project includes a GitHub Actions workflow that automatically verifies builds on pull requests to the main branch. This ensures that all code changes maintain the project's build integrity.
+
+The CI workflow:
+- Runs on pull request to main branch
+- Uses Node.js 20.x
+- Installs dependencies
+- Verifies the build process
+
 ## Dependencies
 
 - @modelcontextprotocol/sdk: ^0.6.0

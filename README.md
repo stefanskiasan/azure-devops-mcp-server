@@ -46,11 +46,11 @@ npm run build
 3. Select "Security"
 4. Click "New Token"
 5. Give your token a name and select the required scopes:
-   - `Code (read, write)` - Für Pull Request-Operationen
-   - `Work Items (read, write)` - Für Work Item-Verwaltung
-   - `Build (read, execute)` - Für Pipeline-Operationen
-   - `Wiki (read, write)` - Für Wiki-Operationen
-   - `Project and Team (read)` - Für Projekt- und Board-Informationen
+   - `Code (read, write)` - For Pull Request operations
+   - `Work Items (read, write)` - For Work Item management
+   - `Build (read, execute)` - For Pipeline operations
+   - `Wiki (read, write)` - For Wiki operations
+   - `Project and Team (read)` - For Project and Board information
 6. Copy the generated token
 
 ### 2. Configure Cline MCP Settings
@@ -70,11 +70,8 @@ Add the following configuration to the `mcpServers` object:
       "args": ["/absolute/path/to/azure-devops-server/build/index.js"],
       "env": {
         "AZURE_DEVOPS_ORG": "your-organization",
-        "AZURE_DEVOPS_PAD": "your-personal-access-token",
-        // Entweder Projekt-Name ODER Projekt-ID verwenden:
-        "AZURE_DEVOPS_PROJECT_NAME": "your-project-name",
-        // ODER
-        "AZURE_DEVOPS_PROJECT_ID": "your-project-id"
+        "AZURE_DEVOPS_PAT": "your-personal-access-token",
+        "AZURE_DEVOPS_PROJECT": "your-project-name"
       },
       "disabled": false,
       "autoApprove": []
@@ -87,40 +84,37 @@ Replace the following values:
 - `/absolute/path/to/azure-devops-server`: The absolute path to where you cloned this repository
 - `your-organization`: Your Azure DevOps organization name
 - `your-project-name`: Your Azure DevOps project name
-- `your-project-id`: Alternatively, you can use the project ID instead of the project name
 - `your-personal-access-token`: The PAT you generated in step 1
-
-**Note**: You can use either `AZURE_DEVOPS_PROJECT_NAME` or `AZURE_DEVOPS_PROJECT_ID` for project identification. Using the project ID is recommended for more stable references, as project names might change.
 
 ## Available Tools
 
 ### Work Items
-- `get_work_item`: Abrufen eines Work Items anhand seiner ID
-- `list_work_items`: Abfragen von Work Items mit WIQL
-- `create_work_item`: Erstellen eines neuen Work Items (Bug, Task, User Story)
-- `update_work_item`: Aktualisieren eines bestehenden Work Items
+- `get_work_item`: Get a work item by ID
+- `list_work_items`: Query work items using WIQL
+- `create_work_item`: Create a new work item (Bug, Task, User Story)
+- `update_work_item`: Update an existing work item
 
 ### Boards
-- `get_boards`: Abrufen verfügbarer Boards im Projekt
+- `get_boards`: Get available boards in the project
 
 ### Pipelines
-- `list_pipelines`: Auflisten aller Pipelines im Projekt
-- `trigger_pipeline`: Ausführen einer Pipeline
+- `list_pipelines`: List all pipelines in the project
+- `trigger_pipeline`: Execute a pipeline
 
 ### Pull Requests
-- `list_pull_requests`: Auflisten von Pull Requests
-- `create_pull_request`: Erstellen eines neuen Pull Requests
-- `update_pull_request`: Aktualisieren eines Pull Requests
-- `get_pull_request`: Details eines Pull Requests abrufen
+- `list_pull_requests`: List pull requests
+- `create_pull_request`: Create a new pull request
+- `update_pull_request`: Update a pull request
+- `get_pull_request`: Get pull request details
 
 ### Wiki
-- `get_wikis`: Auflisten aller Wikis im Projekt
-- `get_wiki_page`: Abrufen einer Wiki-Seite
-- `create_wiki`: Erstellen eines neuen Wikis
-- `update_wiki_page`: Erstellen oder Aktualisieren einer Wiki-Seite
+- `get_wikis`: List all wikis in the project
+- `get_wiki_page`: Get a wiki page
+- `create_wiki`: Create a new wiki
+- `update_wiki_page`: Create or update a wiki page
 
-### Projekte
-- `list_projects`: Auflisten aller Projekte in der Azure DevOps Organisation
+### Projects
+- `list_projects`: List all projects in the Azure DevOps organization
 
 ## Verification
 
@@ -135,16 +129,16 @@ npm run inspector
 
 ### Work Items
 ```typescript
-// Abrufen eines Work Items
+// Get a work item
 {
   "id": 123
 }
 
-// Erstellen eines Work Items
+// Create a work item
 {
   "type": "User Story",
-  "title": "Neue Funktion implementieren",
-  "description": "Als Benutzer möchte ich...",
+  "title": "Implement new feature",
+  "description": "As a user I want to...",
   "assignedTo": "max.mustermann@example.com",
   "state": "New"
 }
@@ -152,24 +146,24 @@ npm run inspector
 
 ### Pull Requests
 ```typescript
-// Erstellen eines Pull Requests
+// Create a pull request
 {
   "repositoryId": "repo-id",
   "sourceRefName": "refs/heads/feature",
   "targetRefName": "refs/heads/main",
-  "title": "Feature implementiert",
-  "description": "Diese Änderungen fügen..."
+  "title": "Feature implemented",
+  "description": "These changes add..."
 }
 ```
 
 ### Wiki
 ```typescript
-// Wiki-Seite aktualisieren
+// Update wiki page
 {
   "wikiIdentifier": "wiki-id",
-  "path": "/Dokumentation/Setup",
+  "path": "/Documentation/Setup",
   "content": "# Setup Guide\n...",
-  "comment": "Dokumentation aktualisiert"
+  "comment": "Documentation updated"
 }
 ```
 

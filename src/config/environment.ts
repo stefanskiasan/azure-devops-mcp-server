@@ -1,3 +1,5 @@
+import { env } from 'process';
+
 export interface AzureDevOpsConfig {
   pat: string;
   org: string;
@@ -5,10 +7,10 @@ export interface AzureDevOpsConfig {
   orgUrl: string;
 }
 
-export function createConfig(options?: Partial<Omit<AzureDevOpsConfig, 'orgUrl'>>): AzureDevOpsConfig {
-  const PAT = options?.pat ?? process.env.AZURE_DEVOPS_PAT ?? '';
-  const ORG = options?.org ?? process.env.AZURE_DEVOPS_ORG ?? '';
-  const PROJECT = options?.project ?? process.env.AZURE_DEVOPS_PROJECT ?? '';
+export function createConfig(options?: Partial<AzureDevOpsConfig>): AzureDevOpsConfig {
+  const PAT = options?.pat ?? env.AZURE_DEVOPS_PAT ?? '';
+  const ORG = options?.org ?? env.AZURE_DEVOPS_ORG ?? '';
+  const PROJECT = options?.project ?? env.AZURE_DEVOPS_PROJECT ?? '';
 
   if (!PAT || !ORG || !PROJECT || PAT.trim() === '' || ORG.trim() === '' || PROJECT.trim() === '') {
     throw new Error(

@@ -23,8 +23,8 @@ npx -y @smithery/cli install @stefanskiasan/azure-devops-mcp-server --client cla
 ### Manual Installation
 1. Clone this repository:
 ```bash
-git clone [your-repo-url]
-cd azure-devops-server
+git clone https://github.com/stefanskiasan/azure-devops-mcp-server.git
+cd azure-devops-mcp-server
 ```
 
 2. Install dependencies:
@@ -36,6 +36,8 @@ npm install
 ```bash
 npm run build
 ```
+
+Note: The build output (`build/` directory) is not included in version control. You must run the build command after cloning the repository.
 
 ## Configuration
 

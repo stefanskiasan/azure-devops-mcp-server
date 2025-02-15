@@ -6,6 +6,8 @@ import {
   ErrorCode,
   ListToolsRequestSchema,
   McpError,
+  JSONRPCResponseSchema,
+  JSONRPCResponse
 } from '@modelcontextprotocol/sdk/types.js';
 
 // Import all tools
@@ -17,6 +19,23 @@ import { pipelineTools } from './tools/pipeline/index.js';
 import { pullRequestTools } from './tools/pull-request/index.js';
 import { AzureDevOpsConfig, createConfig } from './config/environment.js';
 
+import { ListToolsResult } from '@modelcontextprotocol/sdk/types.js';
+
+// TODO: Use the proper ToolDefinition type from MCP SDK
+// type ToolDefinition = ReturnType<typeof workItemTools.initialize>['definitions'][number];
+type ToolDefinition = any;
+
+// TODO: Use a proper ToolInstace definition from MCP SDK
+//interface ToolInstances {
+//  workItem: ReturnType<typeof workItemTools.initialize>;
+//  board: ReturnType<typeof boardTools.initialize>;
+//  wiki: ReturnType<typeof wikiTools.initialize>;
+//  project: ReturnType<typeof projectTools.initialize>;
+//  pipeline: ReturnType<typeof pipelineTools.initialize>;
+//  pullRequest: ReturnType<typeof pullRequestTools.initialize>;
+//}
+type ToolInstances = any;
+
 // Type Validations
 function validateArgs<T>(args: Record<string, unknown> | undefined, errorMessage: string): T {
   if (!args) {
@@ -25,21 +44,12 @@ function validateArgs<T>(args: Record<string, unknown> | undefined, errorMessage
   return args as T;
 }
 
-// Response Types
-interface ContentItem {
-  type: string;
-  text: string;
-}
-
-interface McpResponse {
-  content: ContentItem[];
-  isError?: boolean;
-}
+type MCPResponse = JSONRPCResponse["result"]
 
 // Response Formatting
-function formatResponse(data: unknown): McpResponse {
+function formatResponse(data: unknown): MCPResponse {
   if (data && typeof data === 'object' && 'content' in data) {
-    return data as McpResponse;
+    return data as MCPResponse;
   }
   return {
     content: [
@@ -54,7 +64,7 @@ function formatResponse(data: unknown): McpResponse {
 class AzureDevOpsServer {
   private server: Server;
   private config: AzureDevOpsConfig;
-  private toolDefinitions: any[];
+  private toolDefinitions: ToolDefinition[];
 
   constructor(options?: Partial<Omit<AzureDevOpsConfig, 'orgUrl'>>) {
     this.config = createConfig(options);
@@ -101,7 +111,7 @@ class AzureDevOpsServer {
     });
   }
 
-  private setupToolHandlers(tools: any) {
+  private setupToolHandlers(tools: ToolInstances) {
     // List available tools
     this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
       tools: this.toolDefinitions,

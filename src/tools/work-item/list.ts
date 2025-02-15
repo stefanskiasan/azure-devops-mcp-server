@@ -1,13 +1,10 @@
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { AzureDevOpsConnection } from '../../api/connection.js';
 import { AzureDevOpsConfig } from '../../config/environment.js';
+import { Wiql } from 'azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js';
 
-interface ListWorkItemsArgs {
-  query: string;
-}
-
-export async function listWorkItems(args: ListWorkItemsArgs, config: AzureDevOpsConfig) {
-  if (!args.query || typeof args.query !== 'string') {
+export async function listWorkItems(args: Wiql, config: AzureDevOpsConfig) {
+  if (!args.query) {
     throw new McpError(ErrorCode.InvalidParams, 'Invalid WIQL query');
   }
 
@@ -16,7 +13,7 @@ export async function listWorkItems(args: ListWorkItemsArgs, config: AzureDevOps
   const workItemTrackingApi = await connection.getWorkItemTrackingApi();
   
   const queryResult = await workItemTrackingApi.queryByWiql(
-    { query: args.query },
+    args,
     { project: config.project }
   );
 

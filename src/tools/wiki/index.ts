@@ -91,10 +91,13 @@ const definitions = [
 
 export const wikiTools = {
   initialize: (config: AzureDevOpsConfig) => ({
-    getWikis: (args: any) => getWikis(args, config),
-    getWikiPage: (args: any) => getWikiPage(args, config),
-    createWiki: (args: any) => createWiki(args, config),
-    updateWikiPage: (args: any) => updateWikiPage(args, config),
+    getWikis: (args: Record<string, never>) => getWikis(args, config),
+    getWikiPage: (args: { wikiIdentifier: string; path: string; version?: string; includeContent?: boolean }) =>
+      getWikiPage(args, config),
+    createWiki: (args: { name: string; projectId?: string; mappedPath?: string }) =>
+      createWiki(args, config),
+    updateWikiPage: (args: { wikiIdentifier: string; path: string; content: string; comment?: string }) =>
+      updateWikiPage(args, config),
     definitions,
   }),
   definitions,

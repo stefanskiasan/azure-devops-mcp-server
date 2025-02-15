@@ -23,8 +23,8 @@ npx -y @smithery/cli install @stefanskiasan/azure-devops-mcp-server --client cla
 ### Manual Installation
 1. Clone this repository:
 ```bash
-git clone [your-repo-url]
-cd azure-devops-server
+git clone https://github.com/stefanskiasan/azure-devops-mcp-server.git
+cd azure-devops-mcp-server
 ```
 
 2. Install dependencies:
@@ -36,6 +36,8 @@ npm install
 ```bash
 npm run build
 ```
+
+Note: The build output (`build/` directory) is not included in version control. You must run the build command after cloning the repository.
 
 ## Configuration
 
@@ -57,8 +59,8 @@ npm run build
 
 Add the server configuration to your Cline MCP settings file:
 
-- For VSCode extension: `~/Library/Application Support/Windsurf/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json`
-- For Claude desktop app: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- For VSCode extension: `%APPDATA%/Code/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json`
+- For Claude desktop app: `%LOCALAPPDATA%/Claude/claude_desktop_config.json`
 
 Add the following configuration to the `mcpServers` object:
 
@@ -125,48 +127,6 @@ Replace the following values:
 npm run inspector
 ```
 
-## Usage Examples
-
-### Work Items
-```typescript
-// Get a work item
-{
-  "id": 123
-}
-
-// Create a work item
-{
-  "type": "User Story",
-  "title": "Implement new feature",
-  "description": "As a user I want to...",
-  "assignedTo": "max.mustermann@example.com",
-  "state": "New"
-}
-```
-
-### Pull Requests
-```typescript
-// Create a pull request
-{
-  "repositoryId": "repo-id",
-  "sourceRefName": "refs/heads/feature",
-  "targetRefName": "refs/heads/main",
-  "title": "Feature implemented",
-  "description": "These changes add..."
-}
-```
-
-### Wiki
-```typescript
-// Update wiki page
-{
-  "wikiIdentifier": "wiki-id",
-  "path": "/Documentation/Setup",
-  "content": "# Setup Guide\n...",
-  "comment": "Documentation updated"
-}
-```
-
 ## Troubleshooting
 
 1. If the server isn't connecting:
@@ -192,27 +152,6 @@ To modify or extend the server:
 3. Build with `npm run build` when ready
 4. Test using the inspector: `npm run inspector`
 
-## Continuous Integration
-
-The project includes a GitHub Actions workflow that automatically verifies builds on pull requests to the main branch. This ensures that all code changes maintain the project's build integrity.
-
-The CI workflow:
-- Runs on pull request to main branch
-- Uses Node.js 20.x
-- Installs dependencies
-- Verifies the build process
-
-## Dependencies
-
-- @modelcontextprotocol/sdk: ^0.6.0
-- azure-devops-node-api: ^14.1.0
-- node-fetch: ^2.7.0
-- TypeScript: ^5.3.3
-
 ## License
 
-MIT License
-
-Copyright (c) 2025 Asan Stefanski
-
-For full license text, see [LICENSE](LICENSE)
+MIT License - See [LICENSE](LICENSE) for details

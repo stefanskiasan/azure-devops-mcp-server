@@ -1,26 +1,22 @@
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { AzureDevOpsConnection } from '../../api/connection.js';
 import { AzureDevOpsConfig } from '../../config/environment.js';
+import { WorkItemBatchGetRequest, WorkItemExpand, WorkItemErrorPolicy } from 'azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js';
 
-interface GetWorkItemArgs {
-  id: number;
-}
-
-export async function getWorkItem(args: GetWorkItemArgs, config: AzureDevOpsConfig) {
-  if (!args.id || typeof args.id !== 'number') {
+export async function getWorkItem(args: WorkItemBatchGetRequest, config: AzureDevOpsConfig) {
+  if (!args.ids || !args.ids.length) {
     throw new McpError(ErrorCode.InvalidParams, 'Invalid work item ID');
   }
 
   AzureDevOpsConnection.initialize(config);
   const connection = AzureDevOpsConnection.getInstance();
   const workItemTrackingApi = await connection.getWorkItemTrackingApi();
-  const fields = ['System.Id', 'System.Title', 'System.State', 'System.Description'];
-  
-  const workItem = await workItemTrackingApi.getWorkItem(
-    args.id,
-    fields,
-    undefined,
-    undefined,
+  const workItems = await workItemTrackingApi.getWorkItems(
+    args.ids,
+    args.fields || ['System.Id', 'System.Title', 'System.State', 'System.Description'],
+    args.asOf,
+    WorkItemExpand.All,
+    args.errorPolicy,
     config.project
   );
 
@@ -28,7 +24,7 @@ export async function getWorkItem(args: GetWorkItemArgs, config: AzureDevOpsConf
     content: [
       {
         type: 'text',
-        text: JSON.stringify(workItem, null, 2),
+        text: JSON.stringify(workItems, null, 2),
       },
     ],
   };

@@ -1,6 +1,32 @@
 import { WebApi } from 'azure-devops-node-api';
 import { AzureDevOpsConfig } from '../config/environment.js';
+import { WikiError, WikiNotFoundError, WikiPageNotFoundError } from '../errors.js';
 import fetch from 'node-fetch';
+import type { Wiki, WikiPage, WikiPageResponse, WikiType, WikiCreateParameters, WikiPageCreateOrUpdateParameters } from 'azure-devops-node-api/interfaces/WikiInterfaces.js';
+
+interface WikiListResponse {
+  count: number;
+  value: Wiki[];
+}
+
+interface WikiCreateResponse extends WikiCreateParameters {
+  id: string;
+  createdBy: {
+    id: string;
+    displayName: string;
+    uniqueName: string;
+  };
+  createdDate: string;
+}
+
+interface WikiPageUpdateResponse extends WikiPageResponse {
+  lastUpdatedBy: {
+    id: string;
+    displayName: string;
+    uniqueName: string;
+  };
+  lastUpdatedDate: string;
+}
 
 export class WikiApi {
   private connection: WebApi;
@@ -18,7 +44,7 @@ export class WikiApi {
     return `Basic ${token}`;
   }
 
-  async createWiki(name: string, projectId?: string, mappedPath?: string): Promise<any> {
+  async createWiki(name: string, projectId?: string, mappedPath?: string): Promise<WikiCreateResponse> {
     const authHeader = await this.getAuthHeader();
     const response = await fetch(`${this.baseUrl}?api-version=7.0`, {
       method: 'POST',
@@ -35,13 +61,19 @@ export class WikiApi {
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to create wiki: ${response.statusText}`);
+      throw new WikiError(
+        `Failed to create wiki: ${response.statusText}`,
+        response.status,
+        undefined,
+        undefined,
+        await response.text()
+      );
     }
 
     return response.json();
   }
 
-  async getAllWikis(): Promise<any> {
+  async getAllWikis(): Promise<WikiListResponse> {
     const authHeader = await this.getAuthHeader();
     const response = await fetch(`${this.baseUrl}?api-version=7.0`, {
       headers: {
@@ -50,13 +82,19 @@ export class WikiApi {
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to get wikis: ${response.statusText}`);
+      throw new WikiError(
+        `Failed to get wikis: ${response.statusText}`,
+        response.status,
+        undefined,
+        undefined,
+        await response.text()
+      );
     }
 
     return response.json();
   }
 
-  async getWikiPage(wikiIdentifier: string, path: string): Promise<any> {
+  async getWikiPage(wikiIdentifier: string, path: string): Promise<WikiPage> {
     const authHeader = await this.getAuthHeader();
     const encodedPath = encodeURIComponent(path);
     const response = await fetch(
@@ -68,8 +106,21 @@ export class WikiApi {
       }
     );
 
+    if (response.status === 404) {
+      if (response.statusText.includes('Wiki not found')) {
+        throw new WikiNotFoundError(wikiIdentifier);
+      }
+      throw new WikiPageNotFoundError(wikiIdentifier, path);
+    }
+
     if (!response.ok) {
-      throw new Error(`Failed to get wiki page: ${response.statusText}`);
+      throw new WikiError(
+        `Failed to get wiki page: ${response.statusText}`,
+        response.status,
+        wikiIdentifier,
+        path,
+        await response.text()
+      );
     }
 
     return response.json();
@@ -80,7 +131,7 @@ export class WikiApi {
     path: string,
     content: string,
     comment?: string
-  ): Promise<any> {
+  ): Promise<WikiPageUpdateResponse> {
     const authHeader = await this.getAuthHeader();
     const encodedPath = encodeURIComponent(path);
     const response = await fetch(
@@ -98,8 +149,21 @@ export class WikiApi {
       }
     );
 
+    if (response.status === 404) {
+      if (response.statusText.includes('Wiki not found')) {
+        throw new WikiNotFoundError(wikiIdentifier);
+      }
+      throw new WikiPageNotFoundError(wikiIdentifier, path);
+    }
+
     if (!response.ok) {
-      throw new Error(`Failed to update wiki page: ${response.statusText}`);
+      throw new WikiError(
+        `Failed to update wiki page: ${response.statusText}`,
+        response.status,
+        wikiIdentifier,
+        path,
+        await response.text()
+      );
     }
 
     return response.json();

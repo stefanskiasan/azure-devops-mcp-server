@@ -3,20 +3,47 @@ import { listWorkItems } from './list.js';
 import { createWorkItem } from './create.js';
 import { updateWorkItem } from './update.js';
 import { AzureDevOpsConfig } from '../../config/environment.js';
+import type { WorkItem, WorkItemBatchGetRequest, Wiql } from 'azure-devops-node-api/interfaces/WorkItemTrackingInterfaces.js';
+import type { JsonPatchOperation } from 'azure-devops-node-api/interfaces/common/VSSInterfaces.js';
 
 const definitions = [
   {
     name: 'get_work_item',
-    description: 'Get a work item by ID',
+    description: 'Get work items by IDs',
     inputSchema: {
       type: 'object',
       properties: {
-        id: {
-          type: 'number',
-          description: 'Work item ID',
+        ids: {
+          type: 'array',
+          items: {
+            type: 'number'
+          },
+          description: 'Work item IDs',
         },
+        fields: {
+          type: 'array',
+          items: {
+            type: 'string'
+          },
+          description: 'Fields to include (e.g., "System.Title", "System.State")',
+        },
+        asOf: {
+          type: 'string',
+          format: 'date-time',
+          description: 'As of a specific date (ISO 8601)',
+        },
+        $expand: {
+          type: 'number',
+          enum: [0, 1, 2, 3, 4],
+          description: 'Expand options (None=0, Relations=1, Fields=2, Links=3, All=4)',
+        },
+        errorPolicy: {
+          type: 'number',
+          enum: [1, 2],
+          description: 'Error policy (Fail=1, Omit=2)',
+        }
       },
-      required: ['id'],
+      required: ['ids'],
     },
   },
   {
@@ -35,7 +62,7 @@ const definitions = [
   },
   {
     name: 'create_work_item',
-    description: 'Create a new work item',
+    description: 'Create a new work item using JSON patch operations',
     inputSchema: {
       type: 'object',
       properties: {
@@ -43,36 +70,35 @@ const definitions = [
           type: 'string',
           description: 'Work item type (e.g., "Bug", "Task", "User Story")',
         },
-        title: {
-          type: 'string',
-          description: 'Title of the work item',
-        },
-        description: {
-          type: 'string',
-          description: 'Description of the work item',
-        },
-        assignedTo: {
-          type: 'string',
-          description: 'Email or name of the person to assign the work item to',
-        },
-        state: {
-          type: 'string',
-          description: 'State of the work item (e.g., "New", "Active", "Closed")',
-        },
-        tags: {
+        document: {
           type: 'array',
           items: {
-            type: 'string',
+            type: 'object',
+            properties: {
+              op: {
+                type: 'string',
+                enum: ['add', 'remove', 'replace', 'move', 'copy', 'test'],
+                description: 'The patch operation to perform',
+              },
+              path: {
+                type: 'string',
+                description: 'The path for the operation (e.g., /fields/System.Title)',
+              },
+              value: {
+                description: 'The value for the operation',
+              },
+            },
+            required: ['op', 'path'],
           },
-          description: 'Tags to apply to the work item',
+          description: 'Array of JSON patch operations to apply',
         },
       },
-      required: ['type', 'title'],
+      required: ['type', 'document'],
     },
   },
   {
     name: 'update_work_item',
-    description: 'Update an existing work item',
+    description: 'Update an existing work item using JSON patch operations',
     inputSchema: {
       type: 'object',
       properties: {
@@ -80,41 +106,40 @@ const definitions = [
           type: 'number',
           description: 'ID of the work item to update',
         },
-        title: {
-          type: 'string',
-          description: 'New title of the work item',
-        },
-        description: {
-          type: 'string',
-          description: 'New description of the work item',
-        },
-        assignedTo: {
-          type: 'string',
-          description: 'Email or name of the person to assign the work item to',
-        },
-        state: {
-          type: 'string',
-          description: 'New state of the work item',
-        },
-        tags: {
+        document: {
           type: 'array',
           items: {
-            type: 'string',
+            type: 'object',
+            properties: {
+              op: {
+                type: 'string',
+                enum: ['add', 'remove', 'replace', 'move', 'copy', 'test'],
+                description: 'The patch operation to perform',
+              },
+              path: {
+                type: 'string',
+                description: 'The path for the operation (e.g., /fields/System.Title)',
+              },
+              value: {
+                description: 'The value for the operation',
+              },
+            },
+            required: ['op', 'path'],
           },
-          description: 'New tags for the work item',
+          description: 'Array of JSON patch operations to apply',
         },
       },
-      required: ['id'],
+      required: ['id', 'document'],
     },
   },
 ];
 
 export const workItemTools = {
   initialize: (config: AzureDevOpsConfig) => ({
-    getWorkItem: (args: any) => getWorkItem(args, config),
-    listWorkItems: (args: any) => listWorkItems(args, config),
-    createWorkItem: (args: any) => createWorkItem(args, config),
-    updateWorkItem: (args: any) => updateWorkItem(args, config),
+    getWorkItem: (args: WorkItemBatchGetRequest) => getWorkItem(args, config),
+    listWorkItems: (args: Wiql) => listWorkItems(args, config),
+    createWorkItem: (args: { type: string; document: JsonPatchOperation[] }) => createWorkItem(args, config),
+    updateWorkItem: (args: { id: number; document: JsonPatchOperation[] }) => updateWorkItem(args, config),
     definitions,
   }),
   definitions,

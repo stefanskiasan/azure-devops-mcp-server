@@ -3,6 +3,8 @@
 
 This Model Context Protocol (MCP) server provides integration with Azure DevOps, allowing Cline to interact with Azure DevOps services.
 
+<a href="https://glama.ai/mcp/servers/jw1m3bd8lw"><img width="380" height="200" src="https://glama.ai/mcp/servers/jw1m3bd8lw/badge" alt="Azure DevOps Server for Cline MCP server" /></a>
+
 ## Prerequisites
 
 - Node.js (v20 LTS or higher)
